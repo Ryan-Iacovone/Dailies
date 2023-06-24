@@ -1,0 +1,4 @@
+An RDA file is a binary file format used by the R software environment to store datasets and R objects, 
+such as data frames, matrices, and model objects. The R data format allows R objects to be saved to disk and 
+later reloaded into the R environment, preserving their structure and contents. This allows data to be stored and 
+shared between R sessions, and also enables users to save the results of R computations for later use.

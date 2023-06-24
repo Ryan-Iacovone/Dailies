@@ -1,0 +1,442 @@
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(readxl)
+library(writexl)
+library(janitor) #Library for crosstab (tabyl) function
+library(purrr) #Library for map function in ggplot
+library(cowplot) #Combining ggplot outputs into 1 succinct version
+
+
+dalies_orig <- read_excel("C:/Users/Ryan/Coding Projects/Dalies/Data/Dailies.xlsx")
+```
+
+
+```{r}
+dalies_fact <- dalies_orig %>% select(Date, Teeth,Shower, Acne)
+
+#Converting the variables Teeth, Shower, and Acne into factor variables and then labeling them
+dalies_fact$Teeth <- factor(dalies_fact$Teeth, levels=c("X", "Y", "XY"), labels=c("Morning", "Evening", "Both"))
+dalies_fact$Shower <- factor(dalies_fact$Shower, levels=c("X", "XY"), labels=c("Normal", "Acne Shampoo"))
+dalies_fact$Acne <- factor(dalies_fact$Acne, levels=c("X", "Y", "XY"), labels=c("Morning", "Evening", "Both"))
+
+
+#Ensuring that the factor function + labels worked for these variables
+table(dalies_fact$Acne)
+tabyl(dalies_fact$Acne)
+```
+
+
+```{r}
+#Creating a new data set with only the variables we want to change into binary
+dalies_binary_orig <- dalies_orig %>% select(-Date, -Teeth,-Shower, -Acne)
+
+# define a function that takes a variable as input and returns a binary version of the variable
+to_binary <- function(x) {
+  
+# create a new variable with all values equal to 0 then rewriting over it for each new variable
+  binary_var <- rep(0, length(x))
+  
+# set the values of the new variable to 1 where x = "X"
+  binary_var[x == "X"] <- 1
+  
+# return the binary variable
+  return(binary_var)
+}
+
+# apply the function to a list of variables in the dalies2 dataframe
+binary_variables <- sapply(dalies_binary_orig, FUN = to_binary)
+
+# change the binary_variables list into a dataframe
+dalies_bin <- as.data.frame(binary_variables)
+
+#getting rid of excess data sets
+rm(dalies_binary_orig, binary_variables)
+```
+
+
+```{r}
+#Taking all my factor variables and changing them into binary variables 
+
+fact_to_binary <- function(x) {
+  
+# create a new variable with all values equal to 0 then rewriting over it for each new variable
+binary_var <- rep(0, length(x))
+
+# set the values of the new variable to 1 where x = "X"
+binary_var[x != 0] <- 1
+
+# return the binary variable
+return(binary_var)
+}
+
+fct_binary_variables_array <- sapply(dalies_fact, FUN = fact_to_binary)
+
+dalies_fct_as_bin <- as.data.frame(fct_binary_variables_array)
+
+dalies_fct_as_bin <- dalies_fct_as_bin %>% select(-Date)
+
+
+# Rename factor variables to note that they're now binary 
+dalies_fct_as_bin <- dalies_fct_as_bin %>%
+  rename(Teeth_bin = Teeth,
+         Shower_bin = Shower,
+         Acne_bin = Acne)
+
+rm(fct_binary_variables_array, dalies_orig)
+```
+
+
+```{r}
+#Creating a distinct data frame that contains all of the binary variables 
+dalies_bin_all <- bind_cols(dalies_fct_as_bin, dalies_bin)
+
+#combining the factor variables and the dummy variable groups together to dailies_final data frame
+dalies_final <- bind_cols(dalies_fact, dalies_bin_all)
+
+dalies_final$Date <- as.Date(dalies_final$Date)
+
+#Extracting the week day from the newly minted date column
+dalies_final$Week <- weekdays(dalies_final$Date)
+
+#Creating a new 'hidden' binary variable called Week_Num that = 1 every time the week day is Monday
+dalies_final$Week_Num <- ifelse(dalies_final$Week == "Monday", 1, 0)
+
+#Using the newly created binary variable Week_Num to accumulate every time Monday appears thus creating the final variable "week_number" that accurately counts weeks
+dalies_final$week_number <- cumsum(dalies_final$Week_Num)
+
+#class(dalies_final$week_number)
+
+#Adding the newly created variable week_number to my dalies_fact data frame to parse analysis for bar plots at end of code 
+dalies_fact <- cbind(dalies_fact, dalies_final$week_number)
+
+#THE FOLLOWING CODE WORKS BUT IT ONLY CAN BE RUN ONCE SINCE 
+dalies_fact <- dalies_fact %>% rename(week_number = "dalies_final$week_number")
+```
+
+
+```{r}
+#Preemptively creating an empty list to store all of the dataframes in
+Week_averages <- list()
+
+#Getting the names of the binary variables from a previous data frame to input for our average analysis
+variables_bin <- names(dalies_bin_all)
+
+#Using a for loop that creates a new data frame for all binary variables that calculates the success rate of each variable by week
+#The rename() function uses the := operator to assign the new name to the column, on the left side of the operator we use !!paste0(var,"Week average") to create the new name by concatenating var with the string "Week average" , this is passed as the new name for the column "mean_by_week
+for (var in variables_bin){
+  plz <- dalies_final %>% group_by(week_number) %>%
+    summarise(mean_week = mean(!!sym(var))) %>%
+    rename(!!paste0(var,"_Avg") := mean_week)
+  Week_averages[[var]] <- plz
+}
+
+rm(plz)
+
+#How I can index into individual data frames(ex binary variables) from within the master list
+Week_averages[[1]]
+print(Week_averages)
+```
+
+
+```{r}
+plots <- list()
+x_var <- "week_number"
+
+#For note there are 14 y variables 
+y_var <- c( "Teeth_bin_Avg", "Shower_bin_Avg", "Acne_bin_Avg", "Shave_Avg", "Mouthwash_Avg", "Floss_Avg ", "Pills_Avg", "Workout_Avg ", "Run_Avg", "Yoga_Avg ", "Fruit_Avg", "Reading_Avg", "Code_Avg", "Language_Avg")
+
+reference_lines <- (c(.9, .8, .9, .35, .75, .3, .98, .35, .15, .4, .4, .6, .7, .3)) #These numbers correspond to the y_var for goals
+
+plots <- map2(Week_averages, y_var, function(df, y, lines) {
+
+  index <- match(y, y_var)  #the match() function is used to find the index of the current y variable in the y_var vector
+  ggplot(data = df, aes_string(x = x_var, y = y)) +
+    geom_point() +
+    
+    geom_smooth(color = "red", linetype = "solid", se = FALSE) +  #Se = False argument gets rid of confidence interval
+    
+    scale_x_continuous(
+      breaks = seq(20, 45, by = 5),
+      limits = c(20, 45)) +
+    
+    geom_abline(intercept = lines[index], slope =0, color = "green4", linetype = "longdash") +
+    geom_vline(xintercept = 22, color = "purple") +
+    
+    theme_clean()
+  
+  }, reference_lines)
+
+plots[8]
+
+#Combining all of the plots into 1 nice easy to view place
+plot_grid(plotlist = plots, ncol = 4)
+```
+
+
+```{r}
+#Creating a new dataset that removes the date and other useless columns before we run the variables through our for loop to create cross tabs 
+dalies_tabs <- dalies_final %>% select(-Date, -Week, -Week_Num, -week_number)
+
+#Preemptively creating an empty list to store all of our cross tabs in for each variable so that we can append into by specific variable
+xtabs <- list()
+
+# Create a list of the variables from our new data set: dalies1
+variables <- names(dalies_tabs)
+
+# For Loop iterating over our variables creating a cross tab for each individual one
+for (var in variables) {
+  xtab <- tabyl(dalies_tabs, var)
+  xtabs[[var]] <- xtab
+}
+
+rm(xtab)
+
+#code to index into a specific variable
+names(xtabs)
+xtabs[2]
+
+#print the entire list
+xtabs
+```
+
+
+```{r}
+#Following code compares factor variables from up to two weeks ago (14 days ago) to another two week period (between a month ago and 14 days ago) and finally a third group of time from two months ago 
+
+# Sets the dates for the three groups specified above 
+
+end_date <- Sys.Date() # current date
+
+two_weeks <- end_date - 14 # 14 days prior to current date
+one_month <- end_date - 30 # 30 days (1 month) prior to current date
+two_months <- end_date - 60 # 60 days (2 month) prior to current date
+
+#Various data frames created to be input into ggplot 
+
+past_two_weeks <- dalies_fact %>% filter(Date >= two_weeks)
+
+two_to_four_weeks_ago <- dalies_fact %>% filter(Date < two_weeks & Date >= one_month)
+
+two_months_ago <- dalies_fact %>% filter(Date >= two_months & Date < one_month)
+
+# Define list of data frames to iterate through for the following graphs 
+dfs_times <- list(past_two_weeks, two_to_four_weeks_ago, two_months_ago)
+```
+
+
+```{r}
+# Define empty list to store plots
+teeth_plots <- list()
+
+#Titles for all of the graphs 
+graph_titles_T <- list("Teeth Past Two Weeks", "Teeth Two to Four Weeks Ago", "Teeth Two Months Ago")
+
+# Loop through time data frames and create plots for the factor varaible teeth 
+for (i in seq_along(dfs_times)) {   #Equivalent of "range(len(dfs_times))" in python 
+  plot <- ggplot(dfs_times[[i]], aes(Teeth,  fill = Teeth)) +
+    geom_bar(aes(y = (..count..)/sum(..count..)*100),  color = "black", show.legend = FALSE) +
+    xlab("Time") +
+    ylab("Percent (%)") +
+    ggtitle(graph_titles_T[[i]]) +
+    scale_y_continuous(
+      breaks = seq(0, 80, by = 10),
+      minor_breaks = seq(0, 80, by = 5),
+      limits = c(0, 80)
+    ) +
+    scale_fill_brewer(palette = "Spectral") +
+    theme_clean() +
+    theme(
+      panel.grid.minor.y = element_line(color = "gray", linetype = "dotted"),
+      legend.position = c(.7, .85),
+      legend.direction = "horizontal",
+      legend.title = element_text(size = 10.5),
+      legend.text = element_text(size = 10)
+    )
+  
+  # Add plot to list of plots
+  teeth_plots[[i]] <- plot
+}
+
+teeth_plots[[1]]
+
+# Arrange plots in a grid
+plot_grid(plotlist = teeth_plots, ncol = 3)
+```
+
+
+```{r}
+# Define empty list to store plots
+Shower_plots <- list()
+
+graph_titles_S <- list("Shower Past Two Weeks", "Shower Two to Four Weeks Ago", "Shower Two Months Ago")
+
+# Loop through time data frames and create plots for the factor varaible teeth 
+for (i in seq_along(dfs_times)) {   #Equivalent of "range(len(dfs_times))" in python 
+  plot <- ggplot(dfs_times[[i]], aes(Shower, fill = Shower)) +
+    geom_bar(aes(y = (..count..)/sum(..count..)*100),  color = "black", show.legend = FALSE ) +
+    xlab("Time") +
+    ylab("Percent") +
+    ggtitle(graph_titles_S[[i]]) +
+    scale_y_continuous(
+      breaks = seq(0, 70, by = 10),
+      minor_breaks = seq(0, 70, by = 5),
+      limits = c(0, 70)
+    ) +
+    scale_fill_brewer(palette = "Set1") +
+    theme_clean() +
+    theme(
+      panel.grid.minor.y = element_line(color = "gray", linetype = "dotted"),
+      legend.position = c(.7, .85),
+      legend.direction = "horizontal",
+      legend.title = element_text(size = 10.5),
+      legend.text = element_text(size = 10)
+    )
+  
+  # Add plot to list of plots
+  Shower_plots[[i]] <- plot
+}
+
+Shower_plots[[1]]
+
+# Arrange plots in a grid
+plot_grid(plotlist = Shower_plots, ncol = 3)
+```
+
+
+```{r}
+# Define empty list to store plots
+Acne_plots <- list()
+
+graph_titles_A <- list("Acne Past Two Weeks", "Acne Two to Four Weeks Ago", "Acne Two Months Ago")
+
+# Loop through time data frames and create plots for the factor varaible teeth 
+for (i in seq_along(dfs_times)) {   #Equivalent of "range(len(dfs_times))" in python 
+  plot <- ggplot(dfs_times[[i]], aes(Acne, fill = Acne)) +
+    geom_bar(aes(y = (..count..)/sum(..count..)*100),  color = "black", show.legend = FALSE ) +
+    xlab("Time") +
+    ylab("Percent") +
+    ggtitle(graph_titles_A[[i]]) +
+    scale_y_continuous(
+      breaks = seq(0, 60, by = 10),
+      minor_breaks = seq(0, 60, by = 5),
+      limits = c(0, 60)
+    ) +
+    scale_fill_brewer(palette = "Accent")  +
+    theme_clean() +
+    theme(
+      panel.grid.minor.y = element_line(color = "gray", linetype = "dotted"),
+      legend.position = c(.7, .95),
+      legend.direction = "horizontal",
+      legend.title = element_text(size = 10.5),
+      legend.text = element_text(size = 10)
+    )
+  
+  # Add plot to list of plots
+  Acne_plots[[i]] <- plot
+}
+
+Acne_plots[[3]]
+
+# Arrange plots in a grid
+plot_grid(plotlist = Acne_plots, ncol = 3)
+```
+
+
+
+```{r}
+#Contains the correct code for transforming the count into pecentage to be able to compare plots when the week data isn't the same
+fact_1 <- dalies_fact %>% ggplot(aes(Teeth,  fill = Teeth)) +
+  geom_bar(aes(y = (..count..)/sum(..count..)*100),  color = "black" ) +
+  xlab("Time") +
+  ylab("Percent") +
+  ggtitle("Teeth by Time of Day") +
+  scale_y_continuous(
+    breaks = seq(0, 50, by = 10),
+    minor_breaks = seq(0, 50, by = 5), #This function adds in grid lines on y axis every 5 but doesn't add the number! 
+    limits = c(0, 50)
+    ) +
+  scale_fill_brewer(palette = "Spectral") +
+  theme_clean() +
+  theme(
+        panel.grid.minor.y = element_line(color = "gray", linetype = "dotted"),  #Code that specifies the minor gridlines to match the normal default lines at numbers 
+        
+        legend.position = c(.7, .85),
+        legend.direction = "horizontal",
+        legend.title = element_text(size = 10.5),
+        legend.text = element_text(size = 10))
+
+
+fact_2 <- two_months_ago %>% 
+  ggplot(aes(Shower, fill = Shower)) +
+  geom_bar(aes(y = (..count..)/sum(..count..)*100), color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  xlab("Type of Shower") +
+  ylab("Percent") +
+  ggtitle("Description of Shower") +
+  scale_y_continuous(
+    breaks = seq(0, 60, by = 10),
+    minor_breaks = seq(0, 60, by = 5),
+    limits = c(0, 60)
+  ) +
+  theme_clean() +
+  theme(
+    panel.grid.minor.y = element_line(color = "gray", linetype = "dotted"),
+    
+    legend.position = c(.7, .85),
+    legend.direction = "horizontal",
+    legend.title = element_text(size = 10.5),
+    legend.text = element_text(size = 10))
+
+
+fact_3 <- two_to_four_weeks_ago %>% 
+  ggplot(aes(Acne, fill = Acne)) +
+  geom_bar(aes(y = (..count..)/sum(..count..)*100), color = "black") +
+  scale_fill_brewer(palette = "Accent") +
+  xlab("Acne Applied by Time") +
+  ylab("Percent") +
+  ggtitle("Description of Acne") +
+  scale_y_continuous(
+    breaks = seq(0, 60, by = 10),
+    minor_breaks = seq(0, 60, by = 5),
+    limits = c(0, 60)
+  ) +
+  theme_clean() +
+  theme(
+    panel.grid.minor.y = element_line(color = "gray", linetype = "dotted"),
+    
+    legend.position = c(.7, .9),
+    legend.direction = "horizontal",
+    legend.title = element_text(size = 10.5),
+    legend.text = element_text(size = 10)) 
+
+
+plot_grid(fact_1, fact_2, fact_3)
+```
+
+
+```{r}
+library(RColorBrewer  )
+#Displays all colorblind friendly colors in brewer library
+display.brewer.all()
+#Finding and then displaying the code names for specific colorblind friendly colors to use in the following data visualizations
+display.brewer.pal(8, "Paired")
+brewer.pal(8, "Paired")
+```
+
+
+```{r eval=FALSE, include=FALSE}
+#save the plot to a PNG file on the desktop
+
+#ggsave(two, file = "~/Desktop/myplot.png")
+
+
+#Code to export table to an excel sheet!
+
+write_xlsx(dalies_final, "C:/Users/Ryan/Coding Projects/Dalies/Data/Dailies Final.xlsx")
+
+#Code to write an r data file (rda) 
+
+#save(dalies_final, file = "dalies_final.rda")
+
+```

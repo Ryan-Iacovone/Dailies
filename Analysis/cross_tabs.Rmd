@@ -1,0 +1,38 @@
+```{r}
+#Reading in all the libraries and wrangled data frames from this initial R file 
+source("C:/Users/Ryan/Coding Projects/Dalies/Wrangling.R")
+```
+
+
+```{r}
+#How I can index into individual data frames(ex binary variables) from within the master list
+Week_averages[[1]]
+print(Week_averages)
+```
+
+
+```{r}
+#Creating a new dataset that removes the date and other useless columns before we run the variables through our for loop to create cross tabs 
+dalies_tabs <- dalies_final %>% select(-Date, -Week, -Week_Num, -week_number)
+
+#Preemptively creating an empty list to store all of our cross tabs in for each variable so that we can append into by specific variable
+xtabs <- list()
+
+# Create a list of the variables from our new data set: dalies1
+variables <- names(dalies_tabs)
+
+# For Loop iterating over our variables creating a cross tab for each individual one
+for (var in variables) {
+  xtab <- tabyl(dalies_tabs, var)
+  xtabs[[var]] <- xtab
+}
+
+rm(xtab)
+
+#code to index into a specific variable
+names(xtabs)
+xtabs[2]
+
+#print the entire list
+xtabs
+```
