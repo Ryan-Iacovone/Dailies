@@ -99,6 +99,9 @@ dalies_final$Date <- as.Date(dalies_final$Date)
 #Extracting the week day from the newly minted date column
 dalies_final$day <- weekdays(dalies_final$Date)
 
+#Need to change the day variable to a factor variable to specify the order so that it appears nicely on the graph 
+dalies_final$day <- factor(dalies_final$day, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
 #Creating a new 'hidden' binary variable called Week_Num that = 1 every time the week day is Monday
 dalies_final$Week_Num <- ifelse(dalies_final$day == "Monday", 1, 0)
 
@@ -122,11 +125,13 @@ day_averages <- list()
 #Getting the names of the binary variables from a previous data frame to input for our average analysis
 variables_bin <- names(dalies_bin_all)
 
+week_number_filter <- 22
+
 #Using a for loop that creates a new data frame for all binary variables that calculates the success rate of each variable by week
 #The rename() function uses the := operator to assign the new name to the column, on the left side of the operator we use !!paste0(var,"Week average") to create the new name by concatenating var with the string "Week average" , this is passed as the new name for the column "mean_by_week
 for (var in variables_bin){
   plz <- dalies_final %>% 
-    filter(week_number >= 22) %>% # What time period I want to look at (set now for when I revamped my tracking)
+    filter(week_number >= week_number_filter) %>% # What time period I want to look at (set now for when I revamped my tracking)
     group_by(day) %>%
     summarise(mean_day = mean(!!sym(var))) %>%
     rename(!!paste0(var,"_Avg") := mean_day)
@@ -138,11 +143,10 @@ rm(plz)
 #How I can index into individual data frames(ex binary variables) from within the master list
 day_averages[[1]]
 print(day_averages)
-
 ```
 
 
-#Need to work a plot for daily average data 
+# plots for daily average data 
 ```{r}
 day_plots <- list()
 x_var <- "day"
@@ -150,30 +154,28 @@ x_var <- "day"
 #For note there are 14 y variables 
 y_var <- c( "Teeth_bin_Avg", "Shower_bin_Avg", "Acne_bin_Avg", "Shave_Avg", "Mouthwash_Avg", "Floss_Avg", "Pills_Avg", "Workout_Avg ", "Run_Avg", "Yoga_Avg ", "Fruit_Avg", "Reading_Avg", "Code_Avg", "Language_Avg")
 
-reference_lines <- (c(.9, .8, .9, .35, .75, .3, .98, .35, .15, .4, .4, .6, .7, .3)) #These numbers correspond to the y_var for goals
-
-plots <- map2(day_averages, y_var, function(df, y, lines) {
+plots_day <- map2(day_averages, y_var, function(df, y, lines) {
 
   index <- match(y, y_var)  #the match() function is used to find the index of the current y variable in the y_var vector
-  ggplot(data = df, aes_string(x = y, group = factor(day))) + #note the use of "aes_string" because I'm passing in multiple strings not values or objects
-    geom_bar() +
+  ggplot(data = df, aes_string(x = x_var, y = y)) + #note the use of "aes_string" because I'm passing in multiple strings not values or objects
     
-    #scale_x_continuous(
-      #breaks = seq(20, 45, by = 5),
-      #limits = c(20, 45)) +
+    geom_bar(stat = "identity", color = "black", fill = "tomato3") +
     
-    #geom_abline(intercept = lines[index], slope =0, color = "green4", linetype = "longdash") +
-    #geom_vline(xintercept = 22, color = "purple") +
+    labs(x = NULL ) +
     
+    scale_x_discrete(labels = c("M", "T", "W", "TH","F","S","SU")) + # Adding shorter labels to the x axis to better see in plots_day 
+
     theme_clean()
   
-  }, reference_lines)
+  })
 
-plots[8]
+plots_day[8]
+
+plot_grid(plotlist = plots_day, ncol = 4)
 ```
 
 
-
+#Week averages anaylsis
 ```{r}
 #Preemptively creating an empty list to store all of the dataframes in
 Week_averages <- list()
