@@ -83,10 +83,13 @@ dalies_final <- bind_cols(dalies_fact, dalies_bin_all)
 dalies_final$Date <- as.Date(dalies_final$Date)
 
 #Extracting the week day from the newly minted date column
-dalies_final$Week <- weekdays(dalies_final$Date)
+dalies_final$day <- weekdays(dalies_final$Date)
+
+#Need to change the day variable to a factor variable to specify the order so that it appears nicely on the graph 
+dalies_final$day <- factor(dalies_final$day, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
 
 #Creating a new 'hidden' binary variable called Week_Num that = 1 every time the week day is Monday
-dalies_final$Week_Num <- ifelse(dalies_final$Week == "Monday", 1, 0)
+dalies_final$Week_Num <- ifelse(dalies_final$day == "Monday", 1, 0)
 
 #Using the newly created binary variable Week_Num to accumulate every time Monday appears thus creating the final variable "week_number" that accurately counts weeks
 dalies_final$week_number <- cumsum(dalies_final$Week_Num)
