@@ -301,9 +301,9 @@ for (i in seq_along(dfs_times)) {   #Equivalent of "range(len(dfs_times))" in py
     ylab("Percent (%)") +
     ggtitle(graph_titles_T[[i]]) +
     scale_y_continuous(
-      breaks = seq(0, 80, by = 10),
-      minor_breaks = seq(0, 80, by = 5),
-      limits = c(0, 80)
+      breaks = seq(0, 90, by = 10),
+      minor_breaks = seq(0, 90, by = 5),
+      limits = c(0, 90)
     ) +
     scale_fill_brewer(palette = "Spectral") +
     theme_clean() +
@@ -375,13 +375,13 @@ graph_titles_A <- list("Acne Past Two Weeks", "Acne Two to Four Weeks Ago", "Acn
 for (i in seq_along(dfs_times)) {   #Equivalent of "range(len(dfs_times))" in python 
   plot <- ggplot(dfs_times[[i]], aes(Acne, fill = Acne)) +
     geom_bar(aes(y = (..count..)/sum(..count..)*100),  color = "black", show.legend = FALSE ) +
-    xlab("Time") +
-    ylab("Percent") +
+    xlab("") +
+    ylab("Percent (%)") +
     ggtitle(graph_titles_A[[i]]) +
     scale_y_continuous(
-      breaks = seq(0, 60, by = 10),
-      minor_breaks = seq(0, 60, by = 5),
-      limits = c(0, 60)
+      breaks = seq(0, 80, by = 10),
+      minor_breaks = seq(0, 80, by = 5),
+      limits = c(0, 80)
     ) +
     scale_fill_brewer(palette = "Accent")  +
     theme_clean() +
