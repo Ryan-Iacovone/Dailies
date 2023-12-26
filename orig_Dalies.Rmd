@@ -207,7 +207,7 @@ x_var <- "week_number"
 #For note there are 14 y variables 
 y_var <- c( "Teeth_bin_Avg", "Shower_bin_Avg", "Acne_bin_Avg", "Shave_Avg", "Mouthwash_Avg", "Floss_Avg", "Pills_Avg", "Workout_Avg ", "Run_Avg", "Yoga_Avg ", "Fruit_Avg", "Reading_Avg", "Code_Avg", "Language_Avg")
 
-reference_lines <- (c(.9, .8, .9, .35, .75, .3, .98, .35, .15, .4, .4, .6, .7, .3)) #These numbers correspond to the y_var for goals
+reference_lines <- (c(.9, .8, .9, .35, .75, .6, .98, .35, .15, .4, .4, .6, .7, .3)) #These numbers correspond to the y_var for goals
 
 plots <- map2(Week_averages, y_var, function(df, y, lines) {
 
