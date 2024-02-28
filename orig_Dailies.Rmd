@@ -228,7 +228,7 @@ plots <- map2(Week_averages, y_var, function(df, y, lines) {
   
   }, reference_lines)
 
-plots[8]
+plots[14]
 
 #Combining all of the plots into 1 nice easy to view place
 plot_grid(plotlist = plots, ncol = 4)
