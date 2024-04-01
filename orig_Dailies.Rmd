@@ -218,7 +218,7 @@ plots <- map2(Week_averages, y_var, function(df, y, lines) {
     geom_smooth(color = "red", linetype = "solid", se = FALSE) +  #Se = False argument gets rid of confidence interval
     
     scale_x_continuous(
-      breaks = seq(50, 85, by = 5),
+      breaks = seq(50, 85, by = 5), 
       limits = c(50, 85)) +
     
     geom_abline(intercept = lines[index], slope =0, color = "green4", linetype = "longdash") +
